@@ -1815,7 +1815,7 @@ class BelaUI : public GenericUI, public Meta
                             }
                         }
                         if (found_pin != kNoPin) {
-                            TrillCraftWidget* newcraft = new TrillCraftWidget(found_pin, 0, "Keyboard", 0, 0, 0);
+                            TrillCraftWidget* newcraft = new TrillCraftWidget(found_pin, 0, "Keyboard", 0, 0, 0, 0);
                             newcraft->setParameters(values[i].c_str());
                             newcraft->setMode("KEYBOARD");
                             fTrillTable.push_back(newcraft);
