@@ -49,9 +49,10 @@ interval interval_algebra::Inv(const interval& x)
         v = (sign == -1) ? INT_MAX : INT_MIN;
     }
 
-    int precision = exactPrecisionUnary(inv, v, sign * pow(2, x.lsb()));
+    int precision = exactPrecisionUnary(inv, v, sign * std::pow(2, x.lsb()));
     if ((precision == INT_MIN) || taylor_lsb) {
-        precision = floor(x.lsb() - 2 * log2(abs(v)));  // 1/(x+u) - 1/x = -u/x^2 + o(u)
+        precision =
+            std::floor(x.lsb() - 2 * std::log2(std::abs(v)));  // 1/(x+u) - 1/x = -u/x^2 + o(u)
     }
 
     // precision = std::max(precision, -31);

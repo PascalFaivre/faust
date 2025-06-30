@@ -30,6 +30,7 @@ architecture section is not modified.
 
 #include "faust/dsp/dsp.h"
 #include "faust/dsp/libfaust-signal.h"
+#include "faust/dsp/libfaust-box.h"
 #include "faust/gui/meta.h"
 
 /*!
@@ -42,12 +43,12 @@ architecture section is not modified.
  *
  * @return the library version as a static string.
  */
-extern "C" LIFAUST_API const char* getCLibFaustVersion();
+extern "C" LIBFAUST_API const char* getCLibFaustVersion();
 
 /**
  * DSP instance class with methods.
  */
-class LIFAUST_API wasm_dsp : public ::dsp {
+class LIBFAUST_API wasm_dsp : public ::dsp {
     
     private:
     
@@ -85,7 +86,7 @@ class LIFAUST_API wasm_dsp : public ::dsp {
 /**
  * Wasm DSP factory class.
  */
-class LIFAUST_API wasm_dsp_factory : public dsp_factory {
+class LIBFAUST_API wasm_dsp_factory : public dsp_factory {
     
     public:
     
@@ -140,7 +141,7 @@ class LIFAUST_API wasm_dsp_factory : public dsp_factory {
  *
  * @return a valid DSP factory if one is associated with the SHA key, otherwise a null pointer.
  */
-LIFAUST_API wasm_dsp_factory* getWasmDSPFactoryFromSHAKey(const std::string& sha_key);
+LIBFAUST_API wasm_dsp_factory* getWasmDSPFactoryFromSHAKey(const std::string& sha_key);
 
 /**
  * Create a Faust DSP factory from a DSP source code as a file. Note that the library keeps an internal cache of all
@@ -157,7 +158,7 @@ LIFAUST_API wasm_dsp_factory* getWasmDSPFactoryFromSHAKey(const std::string& sha
  *
  * @return a DSP factory on success, otherwise a null pointer.
  */
-LIFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromFile(const std::string& filename, int argc, const char* argv[],
+LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromFile(const std::string& filename, int argc, const char* argv[],
                                                            std::string& error_msg, bool internal_memory);
 
 /**
@@ -175,7 +176,7 @@ LIFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromFile(const std::string& fi
  *
  * @return a DSP factory on success, otherwise a null pointer.
  */
-LIFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromString(const std::string& name_app, const std::string& dsp_content, int argc,
+LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromString(const std::string& name_app, const std::string& dsp_content, int argc,
                                                              const char* argv[], std::string& error_msg, bool internal_memory);
 
 /**
@@ -191,9 +192,28 @@ LIFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromString(const std::string& 
  *
  * @return a DSP factory on success, otherwise a null pointer.
  */
-LIFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromSignals(const std::string& name_app, tvec signals,
+LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromSignals(const std::string& name_app, tvec signals,
                                                               int argc, const char* argv[], std::string& error_msg,
                                                               bool internal_memory);
+
+/**
+ * Create a Faust DSP factory from a box expression.
+ * It has to be used with the box API defined in libfaust-box.h.
+ *
+ * @param name_app - the name of the Faust program
+ * @param box - the box expression
+ * @param argc - the number of parameters in argv array
+ * @param argv - the array of parameters
+ * @param error_msg - the error string to be filled
+ * @param internal_memory - whether to use an internally allocated memory block for wasm module
+ *
+ * @return a DSP factory on success, otherwise a null pointer.
+ */
+LIBFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromBoxes(const std::string& name_app,
+                                                            Box box,
+                                                            int argc, const char* argv[],
+                                                            std::string& error_msg,
+                                                            bool         internal_memory);
 
 /**
  * Delete a Faust DSP factory, that is decrements it's reference counter, possible really deleting the internal pointer.
@@ -204,21 +224,21 @@ LIFAUST_API wasm_dsp_factory* createWasmDSPFactoryFromSignals(const std::string&
  *
  * @return true if the factory internal pointer was really deleted, and false if only 'decremented'.
  */
-LIFAUST_API bool deleteWasmDSPFactory(wasm_dsp_factory* factory);
+LIBFAUST_API bool deleteWasmDSPFactory(wasm_dsp_factory* factory);
 
 /**
  * Delete all Faust DSP factories kept in the library cache. Beware: all kept factory and DSP pointers (in local
  * variables...) thus become invalid.
  *
  */
-LIFAUST_API void deleteAllWasmDSPFactories();
+LIBFAUST_API void deleteAllWasmDSPFactories();
 
 /**
  * Return Faust DSP factories of the library cache as a vector of their SHA keys.
  *
  * @return the Faust DSP factories.
  */
-LIFAUST_API std::vector<std::string> getAllWasmDSPFactories();
+LIBFAUST_API std::vector<std::string> getAllWasmDSPFactories();
 
 /**
  * Create a Faust DSP factory from a machine code string. Note that the library keeps an internal cache of all
@@ -231,7 +251,7 @@ LIFAUST_API std::vector<std::string> getAllWasmDSPFactories();
  *
  * @return the DSP factory on success, otherwise a null pointer.
  */
-LIFAUST_API wasm_dsp_factory* readWasmDSPFactoryFromMachine(const std::string& machine_code, std::string& error_msg);
+LIBFAUST_API wasm_dsp_factory* readWasmDSPFactoryFromMachine(const std::string& machine_code, std::string& error_msg);
 
 /**
  * Write a Faust DSP factory into a machine code string.
@@ -240,7 +260,7 @@ LIFAUST_API wasm_dsp_factory* readWasmDSPFactoryFromMachine(const std::string& m
  *
  * @return the machine code as a string.
  */
-LIFAUST_API std::string writeWasmDSPFactoryToMachine(wasm_dsp_factory* factory);
+LIBFAUST_API std::string writeWasmDSPFactoryToMachine(wasm_dsp_factory* factory);
 
 /**
  * Create a Faust DSP factory from a machine code file. Note that the library keeps an internal cache of all
@@ -253,7 +273,7 @@ LIFAUST_API std::string writeWasmDSPFactoryToMachine(wasm_dsp_factory* factory);
  *
  * @return the DSP factory on success, otherwise a null pointer.
  */
-LIFAUST_API wasm_dsp_factory* readWasmDSPFactoryFromMachineFile(const std::string& machine_code_path, std::string& error_msg);
+LIBFAUST_API wasm_dsp_factory* readWasmDSPFactoryFromMachineFile(const std::string& machine_code_path, std::string& error_msg);
 
 /**
  * Write a Faust DSP factory into a machine code file.
@@ -261,53 +281,13 @@ LIFAUST_API wasm_dsp_factory* readWasmDSPFactoryFromMachineFile(const std::strin
  * @param factory - the DSP factory
  * @param machine_code_path - the machine code file pathname
  *
+ * @return true on success, false on failure.
  */
-LIFAUST_API void writeWasmDSPFactoryToMachineFile(wasm_dsp_factory* factory, const std::string& machine_code_path);
+LIBFAUST_API bool writeWasmDSPFactoryToMachineFile(wasm_dsp_factory* factory, const std::string& machine_code_path);
 
 /*!
  @}
  */
-
-#ifdef EMCC
-#include <emscripten.h>
-#include <emscripten/bind.h>
-using namespace emscripten;
-
-EMSCRIPTEN_BINDINGS(CLASS_wasm_dsp_factory)
-{
-    class_<wasm_dsp_factory>("wasm_dsp_factory")
-    .constructor()
-    .function("createDSPInstance", &wasm_dsp_factory::createDSPInstance, allow_raw_pointers())
-    .function("deleteDSPInstance", &wasm_dsp_factory::deleteDSPInstance, allow_raw_pointers())
-    .class_function("readWasmDSPFactoryFromMachineFile2", &wasm_dsp_factory::readWasmDSPFactoryFromMachineFile2,
-                    allow_raw_pointers())
-    .class_function("readWasmDSPFactoryFromMachine2", &wasm_dsp_factory::readWasmDSPFactoryFromMachine2,
-                    allow_raw_pointers())
-    .class_function("createWasmDSPFactory", &wasm_dsp_factory::createWasmDSPFactory, allow_raw_pointers())
-    .class_function("deleteWasmDSPFactory", &wasm_dsp_factory::deleteWasmDSPFactory2, allow_raw_pointers())
-    .class_function("getErrorMessage", &wasm_dsp_factory::getErrorMessage)
-    .class_function("extractJSON", &wasm_dsp_factory::extractJSON, allow_raw_pointers());
-}
-
-EMSCRIPTEN_BINDINGS(CLASS_wasm_dsp)
-{
-    class_<wasm_dsp>("wasm_dsp")
-    .constructor()
-    .function("getNumInputs", &wasm_dsp::getNumInputs, allow_raw_pointers())
-    .function("getNumOutputs", &wasm_dsp::getNumOutputs, allow_raw_pointers())
-    .function("getSampleRate", &wasm_dsp::getSampleRate, allow_raw_pointers())
-    .function("init", &wasm_dsp::init, allow_raw_pointers())
-    .function("instanceInit", &wasm_dsp::instanceInit, allow_raw_pointers())
-    .function("instanceConstants", &wasm_dsp::instanceConstants, allow_raw_pointers())
-    .function("instanceResetUserInterface", &wasm_dsp::instanceResetUserInterface, allow_raw_pointers())
-    .function("instanceClear", &wasm_dsp::instanceClear, allow_raw_pointers())
-    .function("clone", &wasm_dsp::clone, allow_raw_pointers())
-    .function("compute", &wasm_dsp::computeJS, allow_raw_pointers())
-    .function("setParamValue", &wasm_dsp::setParamValue, allow_raw_pointers())
-    .function("getParamValue", &wasm_dsp::getParamValue, allow_raw_pointers());
-}
-
-#endif
 
 #endif
 /************************** END wasm-dsp.h **************************/

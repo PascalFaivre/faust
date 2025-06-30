@@ -3,7 +3,7 @@ project (faust)
 
 #######################################
 # versions management
-set (VERSION 2.78.6)
+set (VERSION 2.81.2)
 macro (get_major_minor_patch version)
     string( REGEX REPLACE "([0-9]*)\\.([0-9]*)\\.([0-9]*)" "\\1"  VERSION_MAJOR ${version} )
     string( REGEX REPLACE "([0-9]*)\\.([0-9]*)\\.([0-9]*)" "\\2"  VERSION_MINOR ${version} )
@@ -38,9 +38,18 @@ option ( INCLUDE_ITP         "Include Faust Machine library" off )
 option ( INCLUDE_EMCC        "Include emcc targets" on )
 option ( INCLUDE_WASM_GLUE   "Include wasm glue targets" on )
 option ( MSVC_STATIC         "Use static runtimes with MSVC" off)
-option ( SELF_CONTAINED_LIBRARY    "Don't search system architecture files." off)
-option ( LINK_LLVM_STATIC "Link LLVM statically" on )
 option ( NONDETERMINISM_LINT "Add compiler warning for nondeterminism" off)
+option ( INCLUDE_WASMTIME    "Compile with wasmtime support" off)
+option ( SELF_CONTAINED_LIBRARY    "Don't search system architecture files." off)
+option ( LINK_LLVM_STATIC          "Link LLVM statically" on )
+option ( INCLUDE_LLVM_STATIC_IN_ARCHIVE "Combine static LLVM .a files and libfaust.a in a single .a file" on )
+
+if (INCLUDE_WASMTIME)
+    set(WASMTIME_LIB /usr/local/lib/libwasmtime.a)
+    link_directories(/usr/local/lib)
+    add_compile_definitions(WASMTIME)
+endif()
+
 
 #######################################
 # Check output options
@@ -81,7 +90,7 @@ set (FAUST_INC ${SRCDIR}
 ####################################
 # LLVM
 include (misc/llvm.cmake)
-if (INCLUDE_LLVM )
+if (INCLUDE_LLVM)
 
     if ((NOT DEFINED LLVM_LIBS AND NOT MSVC)
         OR NOT DEFINED LLVM_LIB_DIR
@@ -204,11 +213,11 @@ if (INCLUDE_EXECUTABLE)
         add_dependencies(faust NodeMatcherPlugin)
     endif()
     target_compile_definitions (faust PRIVATE ${FAUST_DEFINITIONS})
-    if(INCLUDE_LLVM)
+    if (INCLUDE_LLVM)
         target_link_directories(faust PRIVATE "${LLVM_LIB_DIR}")
     endif()
     target_include_directories (faust PRIVATE ${FAUST_INC} ${LLVM_INCLUDE_DIRS})
-    target_link_libraries (faust PRIVATE ${FAUST_LIBS})
+    target_link_libraries (faust PRIVATE ${FAUST_LIBS} ${WASMTIME_LIB})
     scan_backends (faust COMPILER)
     set_target_properties(faust PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${BINDIR})
     set_target_properties(faust PROPERTIES COMPILE_FLAGS -DFAUST_EXE)
@@ -222,11 +231,11 @@ if (INCLUDE_STATIC)
         add_dependencies(staticlib NodeMatcherPlugin)
     endif()
     target_compile_definitions (staticlib PRIVATE ${FAUST_DEFINITIONS})
-    if(INCLUDE_LLVM)
+    if (INCLUDE_LLVM)
         target_link_directories(staticlib PRIVATE "${LLVM_LIB_DIR}")
     endif()
     target_include_directories (staticlib PRIVATE ${FAUST_INC} ${LLVM_INCLUDE_DIRS})
-    target_link_libraries (staticlib PRIVATE ${FAUST_LIBS})
+    target_link_libraries (staticlib PRIVATE ${FAUST_LIBS} ${WASMTIME_LIB})
     set_target_properties(staticlib PROPERTIES 
         ARCHIVE_OUTPUT_DIRECTORY ${LIBDIR}
         LIBRARY_OUTPUT_DIRECTORY ${LIBDIR}
@@ -243,7 +252,7 @@ if (INCLUDE_STATIC)
         POSITION_INDEPENDENT_CODE ON)
     set (INSTALL_TARGETS ${INSTALL_TARGETS} staticlib)
     scan_backends (staticlib STATIC)
-    if (INCLUDE_LLVM)
+    if (INCLUDE_LLVM AND INCLUDE_LLVM_STATIC_IN_ARCHIVE)
         if (WIN32)
             set (MAKELIBCMD Make.llvm.static.bat) 
         else()
@@ -263,12 +272,12 @@ if (INCLUDE_DYNAMIC)
         add_dependencies(dynamiclib NodeMatcherPlugin)
     endif()
     target_compile_definitions (dynamiclib PRIVATE ${FAUST_DEFINITIONS})
-    if(INCLUDE_LLVM)
+    if (INCLUDE_LLVM)
         target_link_directories(dynamiclib PRIVATE "${LLVM_LIB_DIR}")
     endif()
     target_include_directories (dynamiclib PRIVATE ${FAUST_INC} ${LLVM_INCLUDE_DIRS})
     # set (FAUST_LIBS /usr/local/lib/libmir.a ${FAUST_LIBS})
-    target_link_libraries (dynamiclib PRIVATE ${FAUST_LIBS})
+    target_link_libraries (dynamiclib PRIVATE ${FAUST_LIBS} ${WASMTIME_LIB})
     if (WIN32 OR MSYS)
         enable_language(RC)
         set_target_properties(dynamiclib PROPERTIES
@@ -359,7 +368,7 @@ endif()
 
 ####################################
 # install the faust with llvm library
-if (INCLUDE_STATIC AND INCLUDE_LLVM)
+if (INCLUDE_LLVM AND INCLUDE_STATIC)
 if (WIN32)
     set (LFWITHLLVM  ${LIBDIR}/libfaustwithllvm.lib)
 else()

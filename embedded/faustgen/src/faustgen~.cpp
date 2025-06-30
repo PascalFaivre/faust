@@ -76,6 +76,7 @@ faustgen::faustgen(t_symbol* sym, long ac, t_atom* argv)
     fDSPfactory = nullptr;
     fEditor = nullptr;
     fMute = false;
+    fRNBOAttr = false;
    
     // sym can be "faustgen~" or "mc.faustgen~"
     m_is_mc = (string(sym->s_name) == "mc.faustgen~");
@@ -89,8 +90,12 @@ faustgen::faustgen(t_symbol* sym, long ac, t_atom* argv)
     
     for (i = 0, ap = argv; i < ac; i++, ap++) {
         if (atom_gettype(ap) == A_SYM) {
-            res = allocate_factory(atom_getsym(ap)->s_name);
-            break;
+            // Check "@rnbo" attribute
+            if (strcmp(atom_getsym(ap)->s_name, "@rnbo") == 0) {
+                fRNBOAttr = true;
+            } else {
+                res = allocate_factory(atom_getsym(ap)->s_name);
+            }
         }
     }
     
@@ -124,6 +129,7 @@ faustgen::faustgen(t_symbol* sym, long ac, t_atom* argv)
 // Called upon deleting the object inside the patcher
 faustgen::~faustgen()
 {
+    fDSPfactory->lock_audio();
     free_dsp();
     
     if (fEditor) {
@@ -133,6 +139,7 @@ faustgen::~faustgen()
     
     fDSPfactory->remove_instance(this);    
     fMidiHandler.stopMidi();
+    fDSPfactory->unlock_audio();
 }
 
 void faustgen::assist(void* b, long msg, long a, char* dst)
@@ -355,7 +362,7 @@ void faustgen::polyphony(long inlet, t_symbol* s, long ac, t_atom* av)
     fDSPfactory->unlock_audio();
 }
 
-// Reset controllers to init value and send [path, init, min, max]
+// Reset controllers to init values and send [path, init, min, max]
 void faustgen::init(long inlet, t_symbol* s, long ac, t_atom* av)
 {
     // Reset internal state
@@ -519,11 +526,7 @@ void faustgen::dblclick(long inlet)
             
         case 1:
             // Open the text editor to allow the user to input Faust sourcecode
-            if (m_is_mc && sys_getdspobjdspstate((t_object*)&m_ob)) {
-                post("WARNING : in multichannels mode, the editor cannot be safely used while running !");
-            } else {
-                display_dsp_source();
-            }
+            display_dsp_source();
             break;
             
         case 2:
@@ -569,7 +572,7 @@ void faustgen::edclose(long inlet, char** source_code, long size)
     }
 }
 
-void faustgen::update_sourcecode()
+void faustgen::update_sourcecode(const std::string& codebox)
 {
     // Create a new DSP instance
     create_dsp(false);
@@ -579,6 +582,40 @@ void faustgen::update_sourcecode()
     
     // Send a bang
     outlet_bang(m_control_outlet);
+    
+    // Set codebox code
+    t_object *patcher, *box, *obj;
+    object_obex_lookup(this, gensym("#P"), &patcher);
+    
+    // Loop through objects in the main patcher.
+    if (fRNBOAttr && codebox != "") {
+        for (box = jpatcher_get_firstobject(patcher); box; box = jbox_get_nextobject(box)) {
+            obj = jbox_get_object(box);
+            if (obj && (object_classname(obj) == gensym("rnbo~"))) {
+                // Found an rnbo~ object.
+                t_patcher *subpatcher = NULL;
+                long index = 0;
+                subpatcher = (t_patcher*)object_subpatcher(obj, &index, NULL);
+                if (subpatcher) {
+                    t_box *sub_box = NULL;
+                    // Loop through objects in the rnbo~ subpatcher.
+                    for (sub_box = jpatcher_get_firstobject(subpatcher); sub_box; sub_box = jbox_get_nextobject(sub_box)) {
+                        t_object *sub_obj = jbox_get_object(sub_box);
+                        if (sub_obj && (object_classname(sub_obj) == gensym("codebox~"))) {
+                            t_string* code = string_new(codebox.c_str());
+                            object_method(sub_obj, gensym("setcode"), code);
+                            object_free(code);
+                        } else {
+                            post("rnbo~ does not have codebox~ inside.");
+                        }
+                    }
+                } else {
+                    post("rnbo~ does not have an accessible subpatcher.");
+                }
+            }
+        }
+    }
+    
 }
 
 // Process the signal data with the Faust module
@@ -594,9 +631,11 @@ inline void faustgen::perform(int vs, t_sample** inputs, long numins, t_sample**
         // Has to be tested again when the lock has been taken...
         if (fDSP) {
             if (m_is_mc) {
-                // Not RT but simpler...
-                if (!fMCDSP) {
+                // Not RT but simpler: adapt channel layout at first cycle or when the connected layout changes
+                if (!fMCDSP || (fMCDSP && ((numins != fMCDSP->getNumInputs() || numouts != fMCDSP->getNumOutputs())))) {
+                    delete fMCDSP;
                     fMCDSP = new dsp_adapter(fDSP, numins, fDSP->getNumOutputs(), 4096, false);
+                    std::cout << "new dsp_adapter " << numins << " " << fDSP->getNumOutputs() << std::endl;
                 }
                 fMCDSP->compute(vs, reinterpret_cast<FAUSTFLOAT**>(inputs), reinterpret_cast<FAUSTFLOAT**>(outputs));
             } else {
@@ -794,10 +833,11 @@ void faustgen::create_jsui()
  *
  * mess : "start" or "stop" message
  */
+
+/*
 void faustgen::dsp_status(const char* mess)
 {
     t_pxobject* dac = nullptr;
-    
     if ((dac = check_dac())) {
         t_atom msg[1];
         atom_setsym(msg, gensym(mess));
@@ -805,6 +845,12 @@ void faustgen::dsp_status(const char* mess)
     } else { // Global
         object_method(gensym("dsp")->s_thing, gensym(mess));
     }
+}
+*/
+
+void faustgen::dsp_status(const char* mess)
+{
+    object_method(gensym("dsp")->s_thing, gensym(mess));
 }
 
 /**
@@ -845,7 +891,7 @@ extern "C" void ext_main(void* r)
     
     // Creates as class for Faustgen
     faustgen::makeMaxClass("faustgen~");
-        
+    
     // Creates as class for multi-channels Faustgen
     faustgen::makeMaxClass("mc.faustgen~");
     

@@ -240,9 +240,20 @@ void SignalChecker::visit(Tree sig)
             faustassert(false);
         }
 
-        // signal bounds
+        // Waveform
+    } else if (isSigWaveform(sig)) {
+        int ty = getCertifiedSigType(sig->branch(0))->nature();
+        for (int i = 1; i < sig->arity(); i++) {
+            if (ty != getCertifiedSigType(sig->branch(i))->nature()) {
+                cerr << "ASSERT : isSigWaveform with mixed kInt and kReal values : "
+                     << ppsig(sig, MAX_ERROR_SIZE) << endl;
+                faustassert(false);
+            }
+        }
+
+        // Signal bounds
     } else if (isSigLowest(sig, x) || isSigHighest(sig, x)) {
-        cerr << "ASSERT : annotations should have been deleted in Simplification process" << endl;
+        cerr << "ASSERT : annotations should have been deleted in simplification process" << endl;
         faustassert(false);
 
         // enable/control
@@ -371,6 +382,16 @@ Tree SignalPromotion::transformation(Tree sig)
         return sigFFun(ff, listConvert(clargs));
     }
 
+    else if (isSigPrefix(sig, x, y)) {
+        Type tx = getCertifiedSigType(x);
+        Type ty = getCertifiedSigType(y);
+        if (tx->nature() == ty->nature()) {
+            return sigPrefix(self(x), self(y));
+        } else {
+            return sigPrefix(smartFloatCast(tx, self(x)), smartFloatCast(ty, self(y)));
+        }
+    }
+
     // Select2 (and Select3 expressed with Select2)
     else if (isSigSelect2(sig, sel, x, y)) {
         Type ts = getCertifiedSigType(sel);
@@ -439,6 +460,32 @@ Tree SignalPromotion::transformation(Tree sig)
     else if (isSigVBargraph(sig, label, min, max, t0)) {
         Type tx0 = getCertifiedSigType(t0);
         return sigVBargraph(label, self(min), self(max), smartFloatCast(tx0, self(t0)));
+    }
+
+    // Waveform
+    else if (isSigWaveform(sig)) {
+        int  n     = sig->arity();
+        bool iflag = true;
+        // Check if all values are kInt
+        for (int i = 0; i < n; i++) {
+            Tree v = sig->branch(i);
+            if (!isInt(v->node())) {
+                iflag = false;
+                break;  // Early exit if a non kInt is found
+            }
+        }
+        if (iflag) {
+            return sig;
+        } else {
+            // Some values have to be casted
+            tvec wf;
+            for (int i = 0; i < n; i++) {
+                Tree v  = sig->branch(i);
+                Type tx = getCertifiedSigType(v);
+                wf.push_back(smartFloatCast(tx, v));
+            }
+            return sigWaveform(wf);
+        }
     }
 
     else {
